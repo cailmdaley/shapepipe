@@ -30,7 +30,7 @@ class RandomCat():
     Parameters
     ----------
     input_image_path : str
-        Path to input image file
+        Path to input image file; can be ``None``
     input_mask_path : str
         Path to input mask file
     output_dir : str
@@ -117,22 +117,27 @@ class RandomCat():
         Main function to identify exposures.
 
         """
-        # Read image FITS file header
-        try:
-            img = fits.open(self._input_image_path)
-            header = img[0].header
-        except (OSError, IOError) as error:
-            # FITS file might contain only header.
-            # Try as ascii file
+	    if self._input_image_path is not None:
+            # Read image FITS file header
             try:
-                fin = open(self._input_image_path)
-                header = fits.Header.fromtextfile(fin)
-                fin.close()
-            except Exception:
-                raise
+                img = fits.open(self._input_image_path)
+                header = img[0].header
+            except (OSError, IOError) as error:
+                # FITS file might contain only header.
+                # Try as ascii file
+                try:
+                    fin = open(self._input_image_path)
+                    header = fits.Header.fromtextfile(fin)
+                    fin.close()
+                except Exception:
+                    raise
 
-        # Get WCS
-        WCS = wcs.WCS(header)
+            # Get WCS
+            WCS = wcs.WCS(header)
+
+        else:
+            # No input image given
+            WCS = None
 
         # Read mask FITS file
         hdu_mask = fits.open(self._input_mask_path)
@@ -149,39 +154,50 @@ class RandomCat():
         # Number of non-masked pixels
         n_unmasked = len(np.where(mask == 0)[0])
 
-        # Compute various areas
-
-        # Pixel area in deg^2
-        area_pix = wcs.utils.proj_plane_pixel_area(WCS)
-
-        # Tile area
-        area_deg2 = area_pix * n_pix
-
-        # Area of unmasked region
-        area_deg2_eff = area_pix * n_unmasked
+        # Initialise areas with dummy values
+        area_pix = -1
+        area_deg2 = -1
+        area_deg2_eff = -1
 
         # Compute number of requested objects
-        if n_unmasked > 0:
+        if n_unmasked == 0:
+            # Entire area is masked
+            n_obj = 0
+
+        else:
             if not self._density:
                 # Use value from config file
                 n_obj = self._n_rand
+
             else:
+                if WCS is None:
+                    raise ValueError(
+                        "With DENSITY=True, input image for WCS is required"
+                    )
+
+                # Pixel area in deg^2
+                area_pix = wcs.utils.proj_plane_pixel_area(WCS)
+
+                # Tile area
+                area_deg2 = area_pix * n_pix
+
+                # Area of unmasked region
+                area_deg2_eff = area_pix * n_unmasked
+
                 # Compute number of objects from density
                 n_obj = int(
                     self._n_rand / area_deg2 * area_deg2_eff / area_deg2
                 )
 
-            # Check that a reasonably large number of pixels is not masked
-            if n_unmasked < n_obj:
-                raise ValueError(
-                    f'Number of un-masked pixels {n_unmasked} is smaller '
-                    + f'than number of random objects requested {n_obj}'
-                )
-
-        else:
-            n_obj = 0
+        # Check that a reasonably large number of pixels is not masked
+        if n_unmasked < n_obj:
+            raise ValueError(
+                f'Number of un-masked pixels {n_unmasked} is smaller '
+                + f'than number of random objects requested {n_obj}'
+            )
 
         self._w_log.info(f'Creating {n_obj} random objects')
+
 
         # Draw points until n are in mask
         n_found = 0
@@ -198,18 +214,19 @@ class RandomCat():
                 n_found = n_found + 1
         xy_rand = np.array(xy_rand)
 
-        # Transform to WCS
-        res = WCS.all_pix2world(xy_rand, 1)
-        if n_unmasked > 0:
-            ra_rand = res[:, 0]
-            dec_rand = res[:, 1]
-            x_rand = xy_rand[:, 0]
-            y_rand = xy_rand[:, 1]
-        else:
-            ra_rand = []
-            dec_rand = []
-            x_rand = []
-            y_rand = []
+        if WCS is not None:
+            # Transform to WCS
+            res = WCS.all_pix2world(xy_rand, 1)
+            if n_unmasked > 0:
+                ra_rand = res[:, 0]
+                dec_rand = res[:, 1]
+                x_rand = xy_rand[:, 0]
+                y_rand = xy_rand[:, 1]
+            else:
+                ra_rand = []
+                dec_rand = []
+                x_rand = []
+                y_rand = []
 
         # Tile ID
         output_path = (
