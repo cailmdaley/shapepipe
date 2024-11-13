@@ -79,7 +79,6 @@ RUN pip install --no-cache-dir \
     git+https://github.com/aguinot/ngmix@stable_version \
     git+https://github.com/tobias-liaudat/Stile@v0.1
 
-
 WORKDIR /app
 COPY . /app/.
 
