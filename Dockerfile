@@ -1,56 +1,98 @@
-FROM continuumio/miniconda3
+FROM python:3.12-bookworm
 
-LABEL Description="ShapePipe Docker Image"
-ENV SHELL /bin/bash
+LABEL Description="Conda-Free ShapePipe Docker Image"
+ENV SHELL=/bin/bash
 
-ARG CC=gcc-9
-ARG CXX=g++-9
+# Install system dependencies
+RUN apt-get update -y --quiet --fix-missing && \
+    apt-get dist-upgrade -y --quiet --fix-missing && \
+    apt-get install -y --quiet \
+    acl \
+    apt-utils \
+    autoconf \
+    automake \
+    build-essential \
+    cmake  \
+    curl \
+    ffmpeg \
+    g++ \
+    gcc  \
+    gfortran \
+    git-lfs \
+    libatlas-base-dev  \
+    libblas-dev \
+    libcfitsio-dev \
+    libfftw3-bin  \
+    libfftw3-dev \
+    libgl1-mesa-glx \
+    liblapack-dev \
+    libopenmpi-dev \
+    libtool  \
+    libtool-bin  \
+    libtool-doc \
+    locales \
+    locate \
+    make \
+    openmpi-bin \
+    pandoc \
+    protobuf-compiler \
+    psfex=3.21.1-1 \
+    sextractor=2.25.0+ds-3 \
+    sssd \
+    weightwatcher \
+    vim \
+    xterm && \
+    apt-get clean -y && \
+    apt-get autoremove --purge --quiet -y && \
+    rm -rf /var/lib/apt/lists/* /var/tmp/*
 
-# gcc < 10 is required to compile ww
-ENV CC=gcc-9
-ENV CXX=g++-9
+# Install python dependencies
+RUN pip install --no-cache-dir \ 
+    astropy \
+    cs_util \
+    galsim \
+    joblib \
+    matplotlib \
+    mccd \
+    modopt \
+    mpi4py \
+    numba \
+    numpy \
+    numpydoc \
+    pandas \
+    PyQt5 \
+    pyqtgraph \
+    python-pysap \
+    pytest \
+    pytest-cov \
+    pytest-pycodestyle \
+    pytest-pydocstyle \
+    reproject \
+    sf_tools \
+    sip_tpv \
+    skaha \
+    sqlitedict \
+    termcolor \
+    tqdm \
+    treecorr \
+    vos \
+    git+https://github.com/aguinot/ngmix@stable_version \
+    git+https://github.com/tobias-liaudat/Stile@v0.1
 
-RUN apt-get update --allow-releaseinfo-change && \
-    apt-get update && \
-    apt-get upgrade -y && \
-    apt-get install apt-utils -y && \
-    apt-get install make -y && \
-    apt-get install automake -y && \
-    apt-get install autoconf -y && \
-    apt-get install gcc-9 g++-9 -y && \
-    apt-get install locales -y && \
-    apt-get install libgl1-mesa-glx -y && \
-    apt-get install xterm -y && \
-    apt-get install cmake protobuf-compiler -y && \
-    apt-get install libtool libtool-bin libtool-doc -y && \
-    apt-get install libfftw3-bin libfftw3-dev -y && \
-    apt-get install libatlas-base-dev liblapack-dev libblas-dev -y && \
-    apt-get install vim -y && \
-    apt-get install locate -y && \
-    apt-get install curl -y && \
-    apt-get install acl -y && \
-    apt-get install sssd -y && \
-    apt-get clean
 
-ADD nsswitch.conf /etc/
+WORKDIR /app
+COPY . /app/.
 
-RUN sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen && \
-    locale-gen
-ENV LANG en_US.UTF-8
-ENV LANGUAGE en_US:en
-ENV LC_ALL en_US.UTF-8
 
-SHELL ["/bin/bash", "--login", "-c"]
+# Install shapepipe and symlink scripts
+RUN pip install --no-cache-dir -e . && \ 
+    for ext in .py .sh .bash; do \
+    for script in /app/scripts/*/*$ext; do \
+    link_name=`basename $script $ext`; \
+    ln -s $script /usr/local/bin/$link_name; \
+    done; \
+    done
 
-COPY ./environment.yml ./
-COPY install_shapepipe README.rst setup.py setup.cfg ./
-RUN touch ./README.md
+ENV PATH="/app/scripts:${PATH}"
 
-RUN conda update -n base -c defaults conda -c defaults
-RUN conda env create --file environment.yml
-
-COPY shapepipe ./shapepipe
-COPY scripts ./scripts
-
-RUN source activate shapepipe
-#RUN pip install jupyter
+CMD ["bash"]
