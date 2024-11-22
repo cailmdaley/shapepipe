@@ -3,7 +3,8 @@ name: Deploy API Docs
 on:
   push:
     branches:
-     - v1.4_docker
+     - master
+     - main
 
 jobs:
 
