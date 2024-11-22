@@ -58,7 +58,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir \
     astropy==5.2 \
     cs_util==0.1.0 \
-    galsim==2.2.5 \
+    galsim==2.2.6 \
     ipython==8.18.1 \
     joblib==1.1.0 \
     jupyterlab==4.3.1 \
