@@ -37,7 +37,7 @@ RUN apt-get update -y --quiet --fix-missing && \
     pkg-config \
     protobuf-compiler \
     psfex=3.21.1-1 \
-    sextractor=2.25.0+ds-3 \
+    source-extractor=2.25.0+ds-3 \
     weightwatcher=1.12+dfsg-3 \
     vim \
     xterm && \
